@@ -99,6 +99,20 @@ def generate_report_docx(lon, lat, pnu, jibun_short, jimok_char, jimok_desc, ndv
         run2.add_picture(io.BytesIO(hybrid_img), width=Inches(2.8))
         table.cell(0, 1).paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
     doc.add_paragraph()
+    
+    # ── 2-1. 카카오 초고해상도 스카이뷰 (RPA 캡처) ──
+    try:
+        from kakao_skyview_bot import capture_skyview
+        sv_bytes = capture_skyview(lat, lon)
+        if sv_bytes:
+            p_sv_desc = doc.add_paragraph("▼ 초고해상도 스카이뷰 (지적편집도 적용, 최대 확대)")
+            p_sv_desc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_sv = doc.add_paragraph()
+            p_sv.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_sv.add_run().add_picture(io.BytesIO(sv_bytes), width=Inches(6.0))
+    except Exception as e:
+        doc.add_paragraph(f"(스카이뷰 RPA 구동 실패: {e})")
+    doc.add_paragraph()
 
     # ── 3. 식생지수 시계열 분석 (과거 3년) ──
     doc.add_heading('[ 3. 과거 3년 식생 변화(NDVI) 추이 ]', level=2)
@@ -141,8 +155,25 @@ def generate_report_docx(lon, lat, pnu, jibun_short, jimok_char, jimok_desc, ndv
             cell.add_paragraph(f"{year}년 여름").alignment = WD_ALIGN_PARAGRAPH.CENTER
     doc.add_paragraph()
 
-    # ── 5. 국민신문고 신고용 텍스트 ──
-    doc.add_heading('[ 5. 국민신문고 신고 템플릿 ]', level=2)
+    # ── 5. 현장 로드뷰 (RPA 캡처) ──
+    doc.add_heading('[ 5. 카카오맵 현장 로드뷰 ]', level=2)
+    doc.add_paragraph("파이썬 RPA를 통해 자동 캡처된 현장 주변의 로드뷰 사진입니다. (지형지물 및 불법 건축물/주차장 확인용)")
+    
+    try:
+        from roadview_bot import capture_roadview
+        rv_bytes = capture_roadview(lat, lon)
+        if rv_bytes:
+            p_rv = doc.add_paragraph()
+            p_rv.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_rv.add_run().add_picture(io.BytesIO(rv_bytes), width=Inches(6.0))
+        else:
+            doc.add_paragraph("(로드뷰를 캡처하지 못했거나 해당 지역에 로드뷰가 없습니다.)")
+    except Exception as e:
+        doc.add_paragraph(f"(RPA 모듈 구동 실패: {e})")
+    doc.add_paragraph()
+
+    # ── 6. 국민신문고 신고용 텍스트 ──
+    doc.add_heading('[ 6. 국민신문고 신고 템플릿 ]', level=2)
     template_text = (
         f"농지법 위반 신고합니다.\n"
         f"대상 지번: {parcel_addr} (지목: {jimok_desc})\n\n"
