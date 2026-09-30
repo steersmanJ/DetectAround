@@ -155,3 +155,103 @@ def get_ndvi_timeseries(lon, lat, current_year=2024, years=3):
     # 날짜순 정렬
     results.sort(key=lambda x: x[0])
     return results
+
+def calculate_violation_area(lon, lat, polygon_coords, year=2024, ndvi_threshold=0.25, project_id='gen-lang-client-0917558039'):
+    """
+    Takes a single parcel's polygon coordinates (list of [lon, lat] pairs) and calculates how many square meters 
+    within that polygon have NDVI < threshold.
+    """
+    if not init_gee(project_id):
+        return {'total_area_sqm': 0.0, 'violation_area_sqm': 0.0, 'violation_ratio': 0.0}
+        
+    try:
+        polygon = ee.Geometry.Polygon([polygon_coords])
+        
+        s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+        summer_images = s2.filterBounds(polygon) \
+                          .filterDate(f'{year}-06-01', f'{year}-09-30') \
+                          .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
+        
+        def calc_ndvi(img):
+            ndvi = img.normalizedDifference(['B8', 'B4']).rename('NDVI')
+            return img.addBands(ndvi)
+            
+        median_ndvi = summer_images.map(calc_ndvi).select('NDVI').median()
+        
+        violation_mask = median_ndvi.lt(ndvi_threshold)
+        pixel_area = ee.Image.pixelArea()
+        violation_area_img = pixel_area.updateMask(violation_mask)
+        
+        violation_area = violation_area_img.reduceRegion(
+            reducer=ee.Reducer.sum(),
+            geometry=polygon,
+            scale=10,
+            maxPixels=1e9
+        ).get('area')
+        
+        total_area = polygon.area()
+        
+        v_area_val = violation_area.getInfo()
+        t_area_val = total_area.getInfo()
+        
+        v_area_val = float(v_area_val) if v_area_val is not None else 0.0
+        t_area_val = float(t_area_val) if t_area_val is not None else 0.0
+        
+        ratio = (v_area_val / t_area_val) if t_area_val > 0 else 0.0
+        
+        return {
+            'total_area_sqm': t_area_val,
+            'violation_area_sqm': v_area_val,
+            'violation_ratio': ratio
+        }
+    except Exception as e:
+        print(f"Error calculating violation area: {e}")
+        return {'total_area_sqm': 0.0, 'violation_area_sqm': 0.0, 'violation_ratio': 0.0}
+
+def detect_violation_start_date(lon, lat, years=5, ndvi_threshold=0.25, project_id='gen-lang-client-0917558039'):
+    """
+    Analyzes NDVI over a longer period (default 5 years) to find when vegetation first disappeared.
+    """
+    if not init_gee(project_id):
+        return {'violation_start_year': None, 'yearly_ndvi': []}
+        
+    try:
+        point = ee.Geometry.Point([lon, lat])
+        current_year = 2024
+        start_year = current_year - years + 1
+        yearly_ndvi = []
+        
+        s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+        
+        for y in range(start_year, current_year + 1):
+            summer = s2.filterBounds(point) \
+                       .filterDate(f'{y}-06-01', f'{y}-09-30') \
+                       .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
+            
+            if summer.size().getInfo() > 0:
+                def calc_ndvi(img):
+                    return img.normalizedDifference(['B8', 'B4']).rename('NDVI')
+                    
+                median_ndvi = summer.map(calc_ndvi).median()
+                val = median_ndvi.reduceRegion(
+                    reducer=ee.Reducer.mean(),
+                    geometry=point,
+                    scale=10
+                ).get('NDVI').getInfo()
+                
+                if val is not None:
+                    yearly_ndvi.append((y, float(val)))
+                    
+        violation_start_year = None
+        for y, ndvi in yearly_ndvi:
+            if ndvi < ndvi_threshold:
+                violation_start_year = y
+                break
+                
+        return {
+            'violation_start_year': violation_start_year,
+            'yearly_ndvi': yearly_ndvi
+        }
+    except Exception as e:
+        print(f"Error detecting violation start date: {e}")
+        return {'violation_start_year': None, 'yearly_ndvi': []}

@@ -151,3 +151,127 @@ def get_static_map_image(lon, lat, map_type="PHOTO_HYBRID", zoom=17, width=500, 
     except Exception as e:
         print(f"Static Map API Error: {e}")
     return None
+
+def get_land_use_plan(lon, lat):
+    """
+    Vworld 용도지역 API를 통해 해당 좌표의 토지이용계획 정보를 조회합니다.
+    농업진흥구역/보호구역/일반농지 구분 및 용도지역(농림지역, 관리지역 등)을 반환합니다.
+    """
+    url = "https://api.vworld.kr/req/data"
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Referer': 'http://localhost'}
+    
+    result = {
+        "use_zone": "",           # 용도지역 (예: 농림지역, 관리지역, 자연녹지지역)
+        "agri_promotion": "",     # 농업진흥구역/보호구역/해당없음
+        "is_promotion_area": False,  # 농업진흥구역 여부
+        "penalty_clause": "",     # 적용 벌칙 조항
+        "raw_zones": []           # 원시 용도지역 목록
+    }
+    
+    # 1단계: 용도지역 조회 (LT_C_UQ111)
+    params = {
+        "service": "data",
+        "request": "GetFeature",
+        "data": "LT_C_UQ111",
+        "key": VWORLD_API_KEY,
+        "geomFilter": f"POINT({lon} {lat})",
+        "geometry": "false",
+        "domain": "localhost"
+    }
+    
+    try:
+        res = requests.get(url, params=params, headers=headers, verify=False)
+        if res.status_code == 200:
+            data = res.json()
+            if data['response']['status'] == 'OK':
+                features = data['response']['result']['featureCollection']['features']
+                zones = []
+                for f in features:
+                    uname = f['properties'].get('uname', '')
+                    if uname:
+                        zones.append(uname)
+                result["raw_zones"] = zones
+                result["use_zone"] = ", ".join(zones) if zones else "미확인"
+                
+                # 농업진흥지역 판별: 용도지역명에 '농림' 포함 여부로 1차 판정
+                for zone in zones:
+                    if '농림' in zone:
+                        result["agri_promotion"] = "농업진흥지역(추정)"
+                        result["is_promotion_area"] = True
+                    elif '보전관리' in zone or '생산관리' in zone:
+                        result["agri_promotion"] = "농업보호구역(추정)"
+                        result["is_promotion_area"] = True
+    except Exception as e:
+        print(f"Land Use Plan API Error: {e}")
+    
+    # 2단계: 용도지구 추가 조회 (LT_C_UQ112)
+    try:
+        params2 = params.copy()
+        params2["data"] = "LT_C_UQ112"
+        res2 = requests.get(url, params=params2, headers=headers, verify=False)
+        if res2.status_code == 200:
+            data2 = res2.json()
+            if data2['response']['status'] == 'OK':
+                features2 = data2['response']['result']['featureCollection']['features']
+                for f in features2:
+                    uname = f['properties'].get('uname', '')
+                    if uname and uname not in result["raw_zones"]:
+                        result["raw_zones"].append(uname)
+    except:
+        pass
+    
+    # 농업진흥구역이 미확정이면 일반농지로 분류
+    if not result["agri_promotion"]:
+        result["agri_promotion"] = "농업진흥지역 밖 (일반농지)"
+    
+    # 벌칙 조항 자동 산정
+    if result["is_promotion_area"]:
+        result["penalty_clause"] = "농지법 제58조 제1호 (5년 이하 징역 또는 토지가액 이하 벌금)"
+    else:
+        result["penalty_clause"] = "농지법 제58조 제2호 (3년 이하 징역 또는 토지가액 50% 이하 벌금)"
+    
+    return result
+
+def parse_jurisdiction(address_str):
+    """
+    주소 문자열에서 관할 지자체(시/군/구)를 파싱합니다.
+    예: '경기도 이천시 부발읍 아미리 123-4' -> {'sido': '경기도', 'sigungu': '이천시', 'full': '경기도 이천시'}
+    """
+    result = {"sido": "", "sigungu": "", "full": ""}
+    
+    if not address_str:
+        return result
+    
+    parts = address_str.strip().split()
+    if len(parts) >= 1:
+        result["sido"] = parts[0]
+    if len(parts) >= 2:
+        result["sigungu"] = parts[1]
+        result["full"] = f"{parts[0]} {parts[1]}"
+    
+    return result
+
+def estimate_penalty(jiga_per_sqm, total_area_sqm, violation_area_sqm, is_promotion_area):
+    """
+    농지법 위반 시 예상 벌금 범위를 산출합니다.
+    - 농업진흥구역: 토지가액(개별공시지가 × 면적) 100% 이하 벌금
+    - 일반농지: 토지가액 50% 이하 벌금
+    """
+    if not jiga_per_sqm or not violation_area_sqm:
+        return None
+    
+    land_value = jiga_per_sqm * violation_area_sqm
+    
+    if is_promotion_area:
+        max_fine = land_value
+        clause = "제58조 제1호"
+    else:
+        max_fine = land_value * 0.5
+        clause = "제58조 제2호"
+    
+    return {
+        "land_value": land_value,
+        "max_fine": max_fine,
+        "clause": clause,
+        "description": f"토지가액 {land_value:,.0f}원 기준, 최대 벌금 {max_fine:,.0f}원 ({clause})"
+    }

@@ -209,7 +209,14 @@ with col2:
                             if st.button("🔄 Generate", key=f"gen_{idx}", use_container_width=True):
                                 with st.spinner("Wait..."):
                                     jiga = p.get("jiga")
-                                    st.session_state[docx_key] = generate_report_docx(clon, clat, pnu, jibun, jc, jd, ns, jiga)
+                                    # 폴리곤 좌표 추출 (위반 면적 산출용)
+                                    poly_coords = None
+                                    geom = f.get("geometry")
+                                    if geom and geom.get("type") == "Polygon":
+                                        poly_coords = geom["coordinates"][0]
+                                    elif geom and geom.get("type") == "MultiPolygon":
+                                        poly_coords = geom["coordinates"][0][0]
+                                    st.session_state[docx_key] = generate_report_docx(clon, clat, pnu, jibun, jc, jd, ns, jiga, poly_coords)
                                     st.rerun()
                         else:
                             st.download_button(
