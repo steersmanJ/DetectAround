@@ -7,8 +7,12 @@ CLIP_REGION = {"x": 390, "y": 80, "width": 1024 - 390 - 60, "height": 768 - 80 -
 def hide_ui(page):
     try:
         page.evaluate('''
-            const popups = document.querySelectorAll('.Popup, .layer_usedistrict, .CoachMark, .View .Panel, .View .Search, .info_roadview');
-            popups.forEach(el => { if(el) el.style.display = 'none'; });
+            const popups = document.querySelectorAll('.Popup, .layer_usedistrict, .CoachMark, .View .Panel, .View .Search, .info_roadview, .InfoWindow, .infoWindow, .dimmed_layer, .layer_body');
+            popups.forEach(el => { if(el) el.remove(); });
+            
+            // X(닫기) 버튼 강제 클릭
+            const closeBtns = document.querySelectorAll('button[title="닫기"], .btn_close');
+            closeBtns.forEach(btn => { if(btn) btn.click(); });
         ''')
     except:
         pass
@@ -53,7 +57,7 @@ def capture_cadastral_map(lat, lon):
     위성사진이 아닌 카카오맵 일반지도(TYPE_MAP) 상태에서 지적편집도를 활성화하여
     순수 지적도 캡처본을 반환합니다.
     """
-    url = f"https://map.kakao.com/?map_type=TYPE_MAP&q={lat},{lon}&level=2"
+    url = f"https://map.kakao.com/?map_type=TYPE_MAP&q={lat},{lon}&level=1"
     print(f"RPA 봇 구동 중... 지적도 접속 시도: {url}")
     
     try:
