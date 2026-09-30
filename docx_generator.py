@@ -82,8 +82,21 @@ def generate_report_docx(lon, lat, pnu, jibun_short, jimok_char, jimok_desc, ndv
     doc.add_paragraph()
 
     # ── 2. 현장 위성 및 지적도 사진 ──
-    doc.add_heading('[ 2. 현재 상태 (일반지도 및 지적위성) ]', level=2)
-    graphic_img = get_static_map_image(lon, lat, map_type="GRAPHIC")
+    doc.add_heading('[ 2. 현재 상태 (지적도 및 지적위성) ]', level=2)
+    
+    # 1. 일반지도(지적도) 가져오기: 카카오 RPA 우선 시도, 실패시 Vworld
+    graphic_img = None
+    try:
+        from kakao_skyview_bot import capture_cadastral_map
+        kakao_cadastral_bytes = capture_cadastral_map(lat, lon)
+        if kakao_cadastral_bytes:
+            graphic_img = kakao_cadastral_bytes
+    except:
+        pass
+        
+    if not graphic_img:
+        graphic_img = get_static_map_image(lon, lat, map_type="GRAPHIC")
+        
     hybrid_img = get_static_map_image(lon, lat, map_type="PHOTO_HYBRID")
     
     table = doc.add_table(rows=1, cols=2)
@@ -93,11 +106,13 @@ def generate_report_docx(lon, lat, pnu, jibun_short, jimok_char, jimok_desc, ndv
         run = table.cell(0, 0).paragraphs[0].add_run()
         run.add_picture(io.BytesIO(graphic_img), width=Inches(2.8))
         table.cell(0, 0).paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        table.cell(0, 0).add_paragraph("지적도 (필지 경계)").alignment = WD_ALIGN_PARAGRAPH.CENTER
     
     if hybrid_img:
         run2 = table.cell(0, 1).paragraphs[0].add_run()
         run2.add_picture(io.BytesIO(hybrid_img), width=Inches(2.8))
         table.cell(0, 1).paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        table.cell(0, 1).add_paragraph("위성 지적도").alignment = WD_ALIGN_PARAGRAPH.CENTER
     doc.add_paragraph()
     
     # ── 2-1. 카카오 초고해상도 스카이뷰 (RPA 캡처) ──
