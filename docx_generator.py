@@ -161,11 +161,25 @@ def generate_report_docx(lon, lat, pnu, jibun_short, jimok_char, jimok_desc, ndv
     
     try:
         from roadview_bot import capture_roadview
-        rv_bytes = capture_roadview(lat, lon)
-        if rv_bytes:
-            p_rv = doc.add_paragraph()
-            p_rv.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p_rv.add_run().add_picture(io.BytesIO(rv_bytes), width=Inches(6.0))
+        rv_bytes_list = capture_roadview(lat, lon)
+        if rv_bytes_list and len(rv_bytes_list) > 0:
+            if len(rv_bytes_list) == 1:
+                p_rv = doc.add_paragraph()
+                p_rv.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p_rv.add_run().add_picture(io.BytesIO(rv_bytes_list[0]), width=Inches(6.0))
+            else:
+                doc.add_paragraph("💡 아래 4장의 360도 회전 사진 중 타겟 농지가 가장 잘 보이는 사진만 남기고 나머지는 삭제해 주세요.")
+                rv_table = doc.add_table(rows=2, cols=2)
+                rv_table.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                
+                for idx, img_bytes in enumerate(rv_bytes_list):
+                    row_idx = idx // 2
+                    col_idx = idx % 2
+                    cell = rv_table.cell(row_idx, col_idx)
+                    p_cell = cell.paragraphs[0]
+                    p_cell.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    p_cell.add_run().add_picture(io.BytesIO(img_bytes), width=Inches(2.8))
+                    cell.add_paragraph(f"사진 {idx+1}").alignment = WD_ALIGN_PARAGRAPH.CENTER
         else:
             doc.add_paragraph("(로드뷰를 캡처하지 못했거나 해당 지역에 로드뷰가 없습니다.)")
     except Exception as e:
