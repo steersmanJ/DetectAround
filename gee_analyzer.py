@@ -102,7 +102,7 @@ def get_yearly_satellite_images(lon, lat, current_year=2024, years=3):
             vis = {'bands': ['B4', 'B3', 'B2'], 'min': 0, 'max': 3000}
             url = median_img.visualize(**vis).getThumbURL({
                 'dimensions': 1024, # 무료 API 한도 내에서 초고해상도로 렌더링
-                'region': point.buffer(300), # 반경 300m로 설정 (식생 변화 관찰용)
+                'region': point.buffer(800), # 반경 800m로 설정 (식생 변화 관찰용)
                 'format': 'png'
             })
             urls.append({'year': y, 'url': url})
