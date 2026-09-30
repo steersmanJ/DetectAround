@@ -29,7 +29,8 @@ def get_cadastral_info(lon, lat):
     }
     
     try:
-        response = requests.get(url, params=params, verify=False)
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        response = requests.get(url, params=params, headers=headers, verify=False)
         if response.status_code == 200:
             data = response.json()
             if data['response']['status'] == 'OK':
@@ -65,7 +66,8 @@ def get_cadastral_box(min_lon, min_lat, max_lon, max_lat):
     agri_features = []
     
     try:
-        response = requests.get(url, params=params, verify=False)
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        response = requests.get(url, params=params, headers=headers, verify=False)
         if response.status_code == 200:
             data = response.json()
             if data['response']['status'] == 'OK':
@@ -109,7 +111,8 @@ def get_detailed_address(lon, lat):
     }
     
     try:
-        res = requests.get(url, params=params, verify=False)
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        res = requests.get(url, params=params, headers=headers, verify=False)
         if res.status_code == 200:
             data = res.json()
             if data.get('response', {}).get('status') == 'OK':
@@ -137,7 +140,8 @@ def get_static_map_image(lon, lat, map_type="PHOTO_HYBRID", zoom=17, width=500, 
     url = f"https://api.vworld.kr/req/image?service=image&request=getmap&key={VWORLD_API_KEY}&center={lon},{lat}&zoom={zoom}&size={width},{height}&basemap={map_type}&marker={lon},{lat}"
     
     try:
-        res = requests.get(url, verify=False)
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        res = requests.get(url, headers=headers, verify=False)
         if res.status_code == 200:
             # 에러 JSON이 아닌 이미지 바이너리가 왔는지 검사 (Vworld 에러는 JSON을 반환함)
             if b'{"response"' in res.content[:20]:
