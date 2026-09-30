@@ -211,7 +211,7 @@ with col2:
                                     jiga = p.get("jiga")
                                     # 폴리곤 좌표 추출 (위반 면적 산출용)
                                     poly_coords = None
-                                    geom = f.get("geometry")
+                                    geom = feat.get("geometry")
                                     if geom and geom.get("type") == "Polygon":
                                         poly_coords = geom["coordinates"][0]
                                     elif geom and geom.get("type") == "MultiPolygon":
