@@ -153,8 +153,27 @@ def generate_report_docx(lon, lat, pnu, jibun_short, jimok_char, jimok_desc, ndv
             else:
                 p_cell.add_run("(구름으로 인해 사진 없음)")
             cell.add_paragraph(f"{year}년 여름").alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
     doc.add_paragraph()
-
+    doc.add_paragraph("▼ [RPA 초고해상도 캡처] 카카오맵 과거 위성사진 비교")
+    
+    try:
+        from kakao_skyview_bot import capture_historical_skyviews
+        hist_skyviews = capture_historical_skyviews(lat, lon, num_years=3)
+        
+        if hist_skyviews:
+            t_hist = doc.add_table(rows=1, cols=len(hist_skyviews))
+            t_hist.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            for i, item in enumerate(hist_skyviews):
+                cell = t_hist.cell(0, i)
+                p_cell = cell.paragraphs[0]
+                p_cell.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p_cell.add_run().add_picture(io.BytesIO(item['bytes']), width=Inches(2.0))
+                cell.add_paragraph(f"{item['year']} (카카오)").alignment = WD_ALIGN_PARAGRAPH.CENTER
+    except Exception as e:
+        doc.add_paragraph(f"(카카오 과거 위성사진 캡처 실패: {e})")
+        
+    doc.add_paragraph()
     # ── 5. 현장 로드뷰 (RPA 캡처) ──
     doc.add_heading('[ 5. 카카오맵 현장 로드뷰 ]', level=2)
     doc.add_paragraph("파이썬 RPA를 통해 자동 캡처된 현장 주변의 로드뷰 사진입니다. (지형지물 및 불법 건축물/주차장 확인용)")
