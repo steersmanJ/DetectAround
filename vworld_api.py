@@ -76,8 +76,12 @@ def get_cadastral_box(min_lon, min_lat, max_lon, max_lat):
                     # 농지(전, 답, 과)만 필터링
                     if jibun.endswith(('전', '답', '과')):
                         agri_features.append(feat)
+            else:
+                st.error(f"Vworld API Data Error: {data}")
+        else:
+            st.error(f"Vworld HTTP Error: {response.status_code}")
     except Exception as e:
-        print(f"API Error: {e}")
+        st.error(f"Vworld Request Exception: {e}")
         
     return agri_features
 
