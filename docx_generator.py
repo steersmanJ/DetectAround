@@ -337,7 +337,7 @@ def generate_report_docx(lon, lat, pnu, jibun_short, jimok_char, jimok_desc, ndv
         f"2. 위반 면적: {violation_area_str}\n"
         f"3. 행위 내용:\n"
         f"  - 농지전용허가를 득하지 않고 농지를 비농업 목적으로 무단 사용 중입니다.\n"
-        f"  - 위성 식생분석(NDVI) 결과 해당 필지의 식생지수가 {ndvi_score:.2f}로 "
+        f"  - 위성 식생분석(NDVI) 결과 해당 필지의 식생지수가 {ndvi_score}로 "
         f"정상 영농 기준치(0.25) 미만이며, 과거 위성사진 비교 결과 형질변경이 확인됩니다.\n"
         f"  - (※ 구체적 위반 유형은 첨부 사진 참조: 주차장/건축물/적치장/성토 등)\n\n"
         f"[관련 법령 위반 내역]\n"
