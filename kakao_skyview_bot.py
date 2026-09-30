@@ -23,7 +23,7 @@ def capture_skyview(lat, lon):
     지적편집도를 켜서 캡처하고 이미지 바이트(jpeg)를 반환합니다.
     (좌측 패널 등 불필요한 UI는 잘라냅니다.)
     """
-    url = f"https://map.kakao.com/?map_type=TYPE_SKYVIEW&q={lat},{lon}&level=2"
+    url = f"https://map.kakao.com/?map_type=TYPE_SKYVIEW&q={lat},{lon}&level=1"
     print(f"RPA 봇 구동 중... 스카이뷰 접속 시도: {url}")
     
     try:
@@ -104,7 +104,7 @@ def capture_historical_skyviews(lat, lon, num_years=3):
     Playwright를 사용하여 카카오맵 스카이뷰 과거 사진을 최대 확대로 띄운 뒤
     최근 N년치의 스카이뷰를 캡처하여 반환합니다. (UI 크롭 적용)
     """
-    url = f"https://map.kakao.com/?map_type=TYPE_SKYVIEW&q={lat},{lon}&level=2"
+    url = f"https://map.kakao.com/?map_type=TYPE_SKYVIEW&q={lat},{lon}&level=1"
     print(f"RPA 봇 구동 중... 과거 스카이뷰 접속 시도: {url}")
     
     results = []
