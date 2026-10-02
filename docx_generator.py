@@ -44,6 +44,8 @@ def generate_report_docx(lon, lat, pnu, jibun_short, jimok_char, jimok_desc, ndv
     python-docx를 사용하여 농지법 위반 의심 현장 조사 보고서를 생성합니다.
     신고 완결성을 위해 토지이용계획, 위반 면적, 위반 시점, 예상 벌금 등을 자동 산출합니다.
     """
+    warnings = []
+    
     doc = Document()
     style = doc.styles['Normal']
     style.font.name = 'Malgun Gothic'
@@ -360,6 +362,42 @@ def generate_report_docx(lon, lat, pnu, jibun_short, jimok_char, jimok_desc, ndv
     p_template.paragraph_format.left_indent = Inches(0.3)
     p_template.style.font.size = Pt(10)
     
+    # 사전 검증 및 무혐의 배제 논리 추가
+    doc.add_heading('[ 7. 무혐의 및 예외 배제 논리 (사전 검증) ]', level=2)
+    exclusion_text = ""
+    
+    # 1. 면적 논리 (가설건축물 예외 배제)
+    viol_sqm = 0
+    if violation_area_info:
+        viol_sqm = violation_area_info.get('violation_area_sqm', 0)
+        if viol_sqm > 33:
+            exclusion_text += f"1. (가설건축물 예외 불가) 본 건의 위반 추정 면적은 약 {viol_sqm:,.0f}㎡로, 농지법 제2조 및 시행규칙상 허용되는 농막(20㎡) 및 농촌체류형 쉼터(33㎡)의 기준 면적을 명백히 초과하므로 합법적 가설건축물(신고 대상)에 해당할 수 없습니다.\n"
+        else:
+            exclusion_text += f"1. (가설건축물 여부 확인 요망) 본 건의 위반 추정 면적은 약 {viol_sqm:,.0f}㎡로, 농지법상 합법적인 가설건축물(농막 20㎡ 등)일 가능성이 일부 존재하므로 현장 실태 조사 전 건축물대장 및 가설건축물 축조신고 여부를 반드시 확인 요망.\n"
+            warnings.append("⚠️ [면적 주의] 위반 추정 면적이 33㎡ 이하로, 합법적인 가설건축물(농막 20㎡ 등)일 가능성이 있습니다. 신고 전 가설건축물대장을 확인하세요.")
+            
+    # 2. 시효 논리 (1973년 이전 전용 배제)
+    if violation_start_info and violation_start_info.get('violation_start_year'):
+        v_year = violation_start_info['violation_start_year']
+        exclusion_text += f"2. (시효 및 법 적용 배제 불가) 위성 시계열 분석 결과 {v_year}년경부터 식생이 소멸(NDVI 급감)된 바, 농지 보전 및 이용에 관한 법률이 시행된 1973년 1월 1일 이전에 이미 전용된 토지가 아님이 명백합니다.\n"
+    else:
+        exclusion_text += "2. (시효 및 법 적용 배제 불가) 위성 식생 지수 분석 결과 최근 수년 내에 식생이 소멸되었으므로, 1973년 1월 1일 이전 전용 토지 주장에 해당하지 않습니다.\n"
+
+    # 3. 휴경 논리
+    try:
+        ndvi_val = float(ndvi_score)
+        if 0.20 <= ndvi_val < 0.25:
+            exclusion_text += f"3. (일시적 휴경 등 조사) NDVI가 {ndvi_val:.2f}로 완전한 나지(0 근접)보다는 다소 높으나 기준치(0.25) 미만입니다. 일시적 휴경이나 불량 경작인지 여부를 현장에서 최종 판단 요망.\n"
+            warnings.append(f"⚠️ [수치 주의] 식생지수(NDVI)가 {ndvi_val:.2f}로 기준치에 근접합니다. 완전한 무단 전용이 아닌 일시적 휴경일 수 있어 계도(처분 유예)로 종결될 가능성이 있습니다.")
+        else:
+            exclusion_text += f"3. (일시적 휴경 배제) 식생지수(NDVI)가 {ndvi_val:.2f}로 심각하게 낮은 바, 이는 단순한 휴경 상태가 아닌 콘크리트 포장, 자재 적치, 건축물 등 물리적 형질변경이 일어났음을 과학적으로 입증합니다.\n"
+    except:
+        pass
+
+    p_exclusion = doc.add_paragraph(exclusion_text)
+    p_exclusion.paragraph_format.left_indent = Inches(0.3)
+    p_exclusion.style.font.size = Pt(10)
+
     # 예상 벌금 참고 정보
     if penalty_info:
         doc.add_paragraph()
@@ -375,4 +413,4 @@ def generate_report_docx(lon, lat, pnu, jibun_short, jimok_char, jimok_desc, ndv
     doc.save(doc_io)
     doc_io.seek(0)
     
-    return doc_io.read()
+    return doc_io.read(), warnings

@@ -214,11 +214,17 @@ with col2:
                                     geom = feat.get("geometry")
                                     if geom and geom.get("type") == "Polygon":
                                         poly_coords = geom["coordinates"][0]
-                                    elif geom and geom.get("type") == "MultiPolygon":
+                                    if geom and geom.get("type") == "MultiPolygon":
                                         poly_coords = geom["coordinates"][0][0]
-                                    st.session_state[docx_key] = generate_report_docx(clon, clat, pnu, jibun, jc, jd, ns, jiga, poly_coords)
+                                    docx_bytes, warnings = generate_report_docx(clon, clat, pnu, jibun, jc, jd, ns, jiga, poly_coords)
+                                    st.session_state[docx_key] = docx_bytes
+                                    if warnings:
+                                        st.session_state[f"warnings_{idx}"] = warnings
                                     st.rerun()
                         else:
+                            if f"warnings_{idx}" in st.session_state:
+                                for w in st.session_state[f"warnings_{idx}"]:
+                                    st.warning(w)
                             st.download_button(
                                 label="💾 Download",
                                 data=st.session_state[docx_key],
