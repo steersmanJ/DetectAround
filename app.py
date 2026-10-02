@@ -3,11 +3,37 @@ import streamlit as st
 import folium
 from streamlit_folium import st_folium
 
+st.set_page_config(page_title="Geospatial Analysis Dashboard", layout="wide")
+
+def check_password():
+    """Returns `True` if the user had the correct password."""
+    def password_entered():
+        try:
+            if st.session_state["password"] == st.secrets.get("APP_PASSWORD", "admin"):
+                st.session_state["password_correct"] = True
+                del st.session_state["password"]
+            else:
+                st.session_state["password_correct"] = False
+        except Exception:
+            st.session_state["password_correct"] = True # No password set
+            
+    if "password_correct" not in st.session_state:
+        st.text_input("🔑 패스워드를 입력하세요", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        st.text_input("🔑 패스워드를 입력하세요", type="password", on_change=password_entered, key="password")
+        st.error("😕 패스워드가 틀렸습니다.")
+        return False
+    return True
+
+if not check_password():
+    st.stop()
+
 from vworld_api import get_cadastral_box, get_cadastral_info
 from gee_analyzer import check_current_vegetation
+import db
 
-st.set_page_config(page_title="Geospatial Analysis Dashboard", layout="wide")
-st.title("🌍 Global Vegetation Analysis Dashboard (V2)")
+st.title("🌍 Global Vegetation Analysis Dashboard (V2) 🔒")
 
 # ── 세션 상태 ──
 for k, v in {
@@ -80,6 +106,19 @@ with st.sidebar:
                 try:
                     res = check_current_vegetation(agri, year=target_year, ndvi_threshold=ndvi_threshold)
                     st.session_state["detected_areas"] = res
+                    
+                    # DB 저장 로직 추가
+                    for feat in res:
+                        p = feat.get("properties", {})
+                        clat, clon = poly_center(feat)
+                        db.save_detection(
+                            lat=clat, lon=clon, 
+                            pnu=p.get("pnu", ""), 
+                            jibun=p.get("jibun", ""), 
+                            jimok=p.get("jimok", ""), 
+                            ndvi=p.get("median", 0.0)
+                        )
+                        
                     st.success(f"Done! {len(res)} suspicious." if res else "All healthy!")
                 except Exception as e:
                     st.error(f"Error: {e}")
@@ -131,7 +170,10 @@ for idx, feat in enumerate(st.session_state["detected_areas"]):
         for poly in co: _d(poly[0])
 
 # ── 레이아웃 ──
-col1, col2 = st.columns([2, 1])
+tab_map, tab_history = st.tabs(["🗺️ 탐지 및 지도", "📊 DB 이력 조회"])
+
+with tab_map:
+    col1, col2 = st.columns([2, 1])
 
 with col1:
     st.subheader("🗺️ Map View")
@@ -218,6 +260,10 @@ with col2:
                                         poly_coords = geom["coordinates"][0][0]
                                     docx_bytes, warnings = generate_report_docx(clon, clat, pnu, jibun, jc, jd, ns, jiga, poly_coords)
                                     st.session_state[docx_key] = docx_bytes
+                                    
+                                    # DB 보고서 생성 이력 기록
+                                    db.save_report(None, pnu, has_warnings=bool(warnings))
+                                    
                                     if warnings:
                                         st.session_state[f"warnings_{idx}"] = warnings
                                     st.rerun()
@@ -242,3 +288,21 @@ with col2:
     st.subheader("🤖 Task Runner")
     if st.button("Execute Task", type="primary"):
         st.code("python report_bot.py", language="bash")
+
+with tab_history:
+    st.subheader("🗄️ 과거 탐지 및 보고서 이력")
+    st.caption("최근 100건의 탐지 이력 및 보고서 생성 내역을 불러옵니다.")
+    
+    if st.button("🔄 새로고침"):
+        st.rerun()
+        
+    try:
+        history_rows = db.get_history()
+        if history_rows:
+            import pandas as pd
+            df = pd.DataFrame(history_rows, columns=["ID", "탐지 일시", "PNU", "지번", "지목", "NDVI", "보고서 생성 일시"])
+            st.dataframe(df, use_container_width=True, hide_index=True)
+        else:
+            st.info("아직 DB에 저장된 이력이 없습니다.")
+    except Exception as e:
+        st.error(f"DB 로딩 에러: {e}")

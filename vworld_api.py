@@ -8,8 +8,8 @@ import streamlit as st
 def get_vworld_key():
     try:
         return st.secrets["VWORLD_API_KEY"]
-    except:
-        return "15B8468B-B7A6-4B22-A26C-726136C6AFB0"
+    except KeyError:
+        raise Exception("VWORLD_API_KEY is not set in .streamlit/secrets.toml")
 
 VWORLD_API_KEY = get_vworld_key()
 
